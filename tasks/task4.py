@@ -10,124 +10,163 @@ import matplotlib.pyplot as plt
 import urllib.request
 import numpy as np
 import orspy
+import pickle
+from contest import Run
 
- 
+
 class State:
-    def __init__(self, sched):
-        self.object_seen = False
+    def __init__(self, sched, simulated):
         self.sched = sched
-        self.object = None
- 
         # self.sched.add_robot('codebox1', utils.bottom_I_close2wall)
-        self.pose_detect = False
-        self.img_detect = False
-        self.action = None
         self.waypoints = [
-            {
-                "coord": orspy.EulerPose(68.73, 105.66, 0, 0, 0, 0),
-                "rotate": False
-            },
-            {
-                "coord": orspy.EulerPose(67, 104.3, 0, 0, 0, 0),
-                "rotate": False
-            },
-            {
-                "coord": orspy.EulerPose(69.3, 104.3, 0, 0, 0, 0),
-                "rotate": False
-            },
-            {
-                "coord": orspy.EulerPose(69.3, 107.5, 0, 0, 0, 0),
-                "rotate": False
-            },
-            {
-                "coord": orspy.EulerPose(67, 107.5, 0, 0, 0, 0),
-                "rotate": False
-            }
+            {"coord": orspy.EulerPose(64.44, 96.632, 0, 0, 0, 0)},
+            {"coord": orspy.EulerPose(66.44, 96.632, 0, 0, 0, 0)},
+            {"coord": orspy.EulerPose(64.44, 96.632, 0, 0, 0, 0)},
         ] # list of positions
-
-        self.dectections = []
-
-    def navigate_to(self, locaction):
-        return self.sched.goto(locaction,
-                allowed_trans_error=0.3, allowed_rot_error=0.5)
-
+        self.simulated = simulated
+        sched.use_simulated(simulated)
+        self.poses = []
+        self.images = []
+        self.objects = []
+        self.last_timestamp = 0
+ 
+    def navigate_to(self, location):
+        return self.sched.goto(location,
+                               allowed_trans_error=0.5, allowed_rot_error=6.)
+ 
     def rotate(self):
         steps = 4
         for _ in range(steps * 2):
             sched.rotate(speed=math.pi/8, maxrot=math.pi/steps)# - math.pi / (steps * 16))
-
-
-
+ 
     def start(self):
-        self.action = navigate_to(0)
         self.topic_img = "{}/object_img".format(self.sched.wws_topic_prefix())
         self.topic_pose = "{}/object_pose".format(self.sched.wws_topic_prefix())
         wws_lite.subscribe(self.topic_img, lambda x: self.wws_detect_img_cb(x))
         wws_lite.subscribe(self.topic_pose, lambda x: self.detect_cb_pose(x))
-
+ 
     def clear_action(self):
         self.sched.stop_action(self.action)
-
+ 
     def end(self):
-        self.clear_action()
         wws_lite.unsubscribe(self.topic_img)
         wws_lite.unsubscribe(self.topic_pose)
+
+    def get_size_data(self, m):
+        bbox = None
+        if self.simulated:
+            bbox = m['object']['payload']['objects']['detections'][0]['bbox']
+        else:
+            bbox = m['object']['payload']['objects']['detections'][0]['bbox']
+        # y_top, x_left, y_bot, x_right = bbox
+        return bbox
        
     def detect_cb_pose(self, m):
-        sleep(0.3)
-        if not self.object_seen:
-            # print('object seen, closing in...')
-            self.sched.stop_action(self.action)
-            self.action = self.sched.fwd(.5, maxdist=0.5)
-            self.object_seen = True
-            self.pose = m
-            self.class_name = m['object']['payload']['objects']['detections'][0]['class_name']
-            # print(f"object type- {m['object']['payload']['objects']['detections'][0]['class_name']}")
-            self.pose_detect = True
+        delta_same_object = 5
+        if self.simulated:
+            if len(m['object']['payload']['objects']['detections']) > 0:
+                # print(m['object']['payload']['objects']['detections'])
+                class_name = m['object']['payload']['objects']['detections'][0]['class_name']
+                self.poses.append(m)
+                # robot pose
+                x = m['pose']['payload']['pose']['pose']['position']['x']
+                y = m['pose']['payload']['pose']['pose']['position']['y']
+                bbox = self.get_size_data(m)
+                size = abs(bbox[1] - bbox[3])
+                if m['timestamp'] - self.last_timestamp > delta_same_object:
+                    self.objects.append({
+                        "name": class_name,
+                        "x": x,
+                        "y": y,
+                        "size": size,
+                        "last_image": len(self.images) + 1
+                    }) # new object
+                else:
+                    if size > self.objects[-1]["size"]:
+                        self.objects[-1] = {
+                            "name": class_name,
+                            "x": x,
+                            "y": y,
+                            "size": size,
+                            "last_image": len(self.images)
+                        } # overwrite current object data
+                self.last_timestamp = m['timestamp']
+        else:
+            if len(m['object']['payload']['detections']) > 0:
+                class_name = m['object']['payload']['detections'][0]['class']['name']
+                self.poses.append(m)
+                # robot pose
+                x = m['pose']['payload']['pose']['position']['x']
+                y = m['pose']['payload']['pose']['position']['y']
+                bbox = self.get_size_data(m)
+                size = abs(bbox[1] - bbox[3])
+                if m['timestamp'] - self.last_timestamp > delta_same_object:
+                    self.objects.append({
+                        "name": class_name,
+                        "x": x,
+                        "y": y,
+                        "size": size,
+                        "last_image": len(self.images) + 1
+                    }) # new object
+                else:
+                    if size > self.objects[-1]["size"]:
+                        self.objects[-1] = {
+                            "name": class_name,
+                            "x": x,
+                            "y": y,
+                            "size": size,
+                            "last_image": len(self.images)
+                        } # overwrite current object data
+                self.last_timestamp = m['timestamp']
+        # print(f"object type- {m['object']['payload']['objects']['detections'][0]['class_name']}")
  
     def wws_detect_img_cb(self, m):
-        if self.object_seen:
-            self.img = m
+        
+        # print(len(self.images), len(self.poses))
+        if len(self.images) < len(self.poses):
             detect = m['image']['url']
             f = urllib.request.urlopen(detect)
             a = plt.imread(f, 0)
-            self.object_img = a
-            self.img_detect = True
+            # print('adding image')
+            while len(self.images) < len(self.poses):
+                self.images.append(a)
 
-    def localize_all_objects(self):
-        pass
-       
     def control_loop(self):
         self.start()
-        location_index = 0
-        for way in self.waypoints:
-            loc = way["coord"]
-            do_rotate = way["rotate"]
-            sleep(0.1)
-
-            navigate_to(loc)
-            if do_rotate:
-                self.rotate()
-                
-
-            #print('sleeping...')
-            #if self.img_detect and self.pose_detect:
-            #      break
+        count = 0
+        for _ in range(1):
+            for way in self.waypoints:
+                loc = way["coord"]
+                self.navigate_to(loc)
+                print(f'saving {len(self.poses)} poses and {len(self.images)} images') #to data_{count}.pickle' )
+                pickle.dump((self.poses, self.images, self.objects), open(f'/home/ros/spinachbots/jupyter/data{count}.pickle', 'wb'))
+                count += 1
+        
+        print(self.objects)
+        run = Run(name="first run", dry_run=self.simulated) # name is only used for display/debugging purposes
+        run.start() # start the run
+        for obj in self.objects:
+            run.localize(obj['name'], [obj['x'], obj['y']]) # submit localization attempt for drone at given [x,y] coordinates
+        run.stop() # stop the run
+        #run.status # returns one of 'init', 'started', 'stopped'
+        #run.events # returns a list of all recorded localization attempt events for this run
+        
         self.end()
-        self.localize_all_objects()
-#       print(self.pose)
-        #s = self.pose['object']['payload']['objects']['detections'][0]['bbox']
-        #print(f"object position- {np.mean(s[0::2]), np.mean(s[1::2])}")
-        # print(self.img)
-        #print(f'class- {self.class_name}')
-        #plt.imshow(self.object_img)
-        #plt.show()
-                 
-                 
-# state = State()
-sched.goto(orspy.EulerPose(68.73, 105.66, 0, 0, 0, 0),
-                                     allowed_trans_error=0.3, allowed_rot_error=0.5)
-# state.control_loop()
+
+sched = utils.Scheduler()
+# sched.add_robot('codebox1', utils.bottom_I_close2wall)
+state = State(sched, simulated=True)
+ 
+# sched.goto(orspy.EulerPose(68.73, 105.66, 0, 0, 0, 0),
+#                                      allowed_trans_error=0.3, allowed_rot_error=0.5)
+state.control_loop()
+state.end()
+#print(state.poses)
+#print(state.images)
 # for i in range(100):
 #     state.sched.stop_action(i)
 # state.delete_state()
+
+
+
+
