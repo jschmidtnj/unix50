@@ -45,7 +45,11 @@ class State:
         self.given_object_data = {
             "tablet": {
                 "num_object": 1,
-                "num_submit": 0
+                "num_submit": 0,
+                "location": {
+                    "x": 69.513,
+                    "y": 95.582
+                }
             },
             "monitor": {
                 "num_object": 1,
@@ -75,13 +79,17 @@ class State:
                 "num_object": 1,
                 "num_submit": 0,
                 "location": {
-                    "x": 67.863,
-                    "y": 94.853
+                    "x": 68.731,
+                    "y": 94.512
                 }
             },
             "hammer": {
                 "num_object": 1,
-                "num_submit": 0
+                "num_submit": 0,
+                "location": {
+                    "x": 65.649,
+                    "y": 110.384
+                }
             },
             "radio": {
                 "num_object": 1,
@@ -93,7 +101,11 @@ class State:
             },
             "phone": {
                 "num_object": 1,
-                "num_submit": 0
+                "num_submit": 0,
+                "location": {
+                    "x": 69.513,
+                    "y": 95.012
+                }
             },
             "saw": {
                 "num_object": 1,
@@ -164,8 +176,8 @@ class State:
         pixels_tall = 480
         focal_length = 0.001933 # meters
         average_location_box = avg([bbox[1], bbox[3]])
-        robot_angle_rad = (robot_angle + 1) / 2. * math.pi * 2)
-        angle_from_robot = (robot_angle_rad - field_of_view / 2. + average_location_box * field_of_view
+        robot_angle_rad = (robot_angle + 1) / 2. * math.pi * 2
+        angle_from_robot = robot_angle_rad - field_of_view / 2. + average_location_box * field_of_view
         x_location = robot_x + math.sin(angle_from_robot) * fudge_factor
         y_location = robot_y + math.cos(angle_from_robot) * fudge_factor
         # account for camera not in center
@@ -289,7 +301,7 @@ class State:
                             self.run.localize(obj_name,
                                     [obj['x'], obj['y']])  # submit localization attempt for drone at given [x,y] coordinates
                     if obj_name == "shipping-box":
-                        print("shipping box company at x: {}, y: {}: {}".format(obj['x'], obj['y'], potential_shipping[0]))
+                        print("shipping box company at x: {}, y: {}: {}".format(obj['x'], obj['y'], potential_shipping[1]))
         for name in self.given_object_data:
             if "location" in self.given_object_data[name] and self.given_object_data[name]["num_submit"] < self.given_object_data[name]["num_object"]:
                 self.run.localize(name,
