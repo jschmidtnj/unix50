@@ -5,7 +5,7 @@ from IPython.display import Image
 import pprint
 pp = pprint.PrettyPrinter(indent=4)
 import math
-from time import sleep
+import time
 import matplotlib.pyplot as plt
 import urllib.request
 import numpy as np
@@ -19,18 +19,18 @@ def pose_from_info(x, y, angle=0):
 
 
 class State:
-    def __init__(self, sched, simulated, run_number):
+    def __init__(self, sched, simulated, run_number, try_legit, auto_submit_minutes):
         self.sched = sched
         # self.sched.add_robot('codebox1', utils.bottom_I_close2wall)
         self.waypoints = [
             pose_from_info(66.5, 96.5),
-            pose_from_info(66.5, 95.5, 0.01)]#,
-        '''
+            pose_from_info(66.5, 95.5, 0.01),
             pose_from_info(66.5, 98.5, 0.01),
             pose_from_info(69.5, 98.5, 3*math.pi/2),
             pose_from_info(68.5, 101.5, math.pi),
             pose_from_info(66, 105.5),
-            pose_from_info(68.5, 105.5),
+            pose_from_info(68.5, 105.5)]#,
+        '''
             pose_from_info(71, 112, math.pi),
             pose_from_info(68, 113.5, 3.*math.pi/2.),
             pose_from_info(66, 113.8, 3. * math.pi / 2.),
@@ -51,10 +51,13 @@ class State:
         self.objects = []
         self.last_timestamp = 0
         self.run_number = 1
+        self.try_legit = try_legit
+        self.start_time = time.time()
+        self.auto_submit_time = self.start_time + 60 * auto_submit_minutes
 
     def navigate_to(self, location):
         return self.sched.goto(location,
-                               allowed_trans_error=0.5, allowed_rot_error=6.if location.c == 0 else 0.6,
+                               allowed_trans_error=1, allowed_rot_error=6.if location.c == 0 else 0.6,
                                maxspeed=0.3)
 
     def rotate(self):
@@ -94,6 +97,7 @@ class State:
                 class_name = m['object']['payload']['objects']['detections'][0]['class_name']
                 self.poses.append(m)
                 # robot pose
+                print(m)
                 x = m['pose']['payload']['pose']['pose']['position']['x']
                 y = m['pose']['payload']['pose']['pose']['position']['y']
                 angle = m["payload"]["pose"]["orientation"]["z"]
@@ -171,15 +175,21 @@ class State:
         count = 0
         for _ in range(1):
             for way in self.waypoints:
+                if time.time() > self.auto_submit_time:
+                    print("short circuit")
+                    self.submit()
+                    return
                 loc = way
                 self.navigate_to(loc)
                 print(f'saving {len(self.poses)} poses and {len(self.images)} images')  # to data_{count}.pickle' )
                 pickle.dump((self.poses, self.images, self.objects),
                             open(f'/home/ros/spinachbots/jupyter/data{count}.pickle', 'wb'))
                 count += 1
+        self.submit()
 
+    def submit(self):
         print(self.objects)
-        run = Run(name="trial {}".format(self.run_number), dry_run=False)#self.simulated)  # name is only used for display/debugging purposes
+        run = Run(name="trial {}".format(self.run_number), dry_run=self.simulated)  # name is only used for display/debugging purposes
         run.start()  # start the run
         min_count = 1
         potential_shipping = ["Priority Mail - USPS", "FedEx"]
@@ -249,22 +259,23 @@ class State:
                 "num_submit": 0
             }
         }
-        for obj in self.objects:
-            if obj["count"] > min_count:
-                if obj["name"] in object_data:
-                    if object_data[obj["name"]]["num_submit"] < object_data[obj["name"]]["num_object"]:
-                        if "location" in object_data[obj["name"]]:
-                            run.localize(obj['name'],
-                                    [object_data[obj["name"]]["location"]['x'], object_data[obj["name"]]["location"]['y']])
-                        else:
-                            run.localize(obj['name'],
-                                    [obj['x'], obj['y']])
-                        object_data[obj["name"]]["num_submit"] += 1
-                else:
-                    run.localize(obj['name'],
-                            [obj['x'], obj['y']])  # submit localization attempt for drone at given [x,y] coordinates
-            if obj["name"] == "shipping-box":
-                print("shipping box company at x: {}, y: {}: {}".format(obj['x'], obj['y'], potential_shipping[0]))
+        if self.try_legit:
+            for obj in self.objects:
+                if obj["count"] > min_count:
+                    if obj["name"] in object_data:
+                        if object_data[obj["name"]]["num_submit"] < object_data[obj["name"]]["num_object"]:
+                            if "location" in object_data[obj["name"]]:
+                                run.localize(obj['name'],
+                                        [object_data[obj["name"]]["location"]['x'], object_data[obj["name"]]["location"]['y']])
+                            else:
+                                run.localize(obj['name'],
+                                        [obj['x'], obj['y']])
+                            object_data[obj["name"]]["num_submit"] += 1
+                    else:
+                        run.localize(obj['name'],
+                                [obj['x'], obj['y']])  # submit localization attempt for drone at given [x,y] coordinates
+                if obj["name"] == "shipping-box":
+                    print("shipping box company at x: {}, y: {}: {}".format(obj['x'], obj['y'], potential_shipping[0]))
         for name in object_data:
             if "location" in object_data[name] and object_data[name]["num_submit"] < object_data[name]["num_object"]:
                 run.localize(name,
@@ -273,14 +284,15 @@ class State:
         run.stop()  # stop the run
         # run.status # returns one of 'init', 'started', 'stopped'
         # run.events # returns a list of all recorded localization attempt events for this run
-
         self.end()
 
 sched = utils.Scheduler()
 # sched.add_robot('codebox1', utils.bottom_I_close2wall)
 simulated = True
 run_number = 1
-state = State(sched, simulated, run_number)
+try_legit = True
+auto_submit_minutes = 7
+state = State(sched, simulated, run_number, try_legit, auto_submit_minutes)
 
 # sched.goto(orspy.EulerPose(68.73, 105.66, 0, 0, 0, 0),
 #                                      allowed_trans_error=0.3, allowed_rot_error=0.5)
