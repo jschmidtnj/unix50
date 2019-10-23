@@ -30,8 +30,7 @@ class State:
             pose_from_info(69.1, 98.5, 3*math.pi/2),
             pose_from_info(68.5, 101.5, math.pi),
             pose_from_info(66, 105.5),
-            pose_from_info(68.5, 105.5)]#,
-        '''
+            pose_from_info(68.5, 105.5)],
             pose_from_info(71, 112, math.pi),
             pose_from_info(68, 113.5, 3.*math.pi/2.),
             pose_from_info(66, 113.8, 3. * math.pi / 2.),
@@ -43,7 +42,7 @@ class State:
             pose_from_info(66.3, 105.5),
             pose_from_info(65, 102, 0.01),
             pose_from_info(65, 97)
-        '''
+        ]
         self.given_object_data = {
             "tablet": {
                 "num_object": 1,
@@ -305,7 +304,7 @@ sched = utils.Scheduler()
 simulated = False
 run_number = 1
 try_legit = True
-auto_submit_minutes = 7
+auto_submit_minutes = 9.5
 state = State(sched, simulated, run_number, try_legit, auto_submit_minutes)
 
 # sched.goto(orspy.EulerPose(68.73, 105.66, 0, 0, 0, 0),
