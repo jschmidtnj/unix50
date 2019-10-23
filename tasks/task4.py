@@ -24,7 +24,8 @@ class State:
         # self.sched.add_robot('codebox1', utils.bottom_I_close2wall)
         self.waypoints = [
             pose_from_info(66.5, 96.5),
-            pose_from_info(66.5, 95.5, 0.01),
+            pose_from_info(66.5, 95.5, 0.01)]#,
+        '''
             pose_from_info(66.5, 98.5, 0.01),
             pose_from_info(69.5, 98.5, 3*math.pi/2),
             pose_from_info(68.5, 101.5, math.pi),
@@ -41,7 +42,8 @@ class State:
             pose_from_info(66.3, 105.5),
             pose_from_info(65, 102, 0.01),
             pose_from_info(65, 97)
-        ] # list of positions
+        '''
+        #] # list of positions
         self.simulated = simulated
         sched.use_simulated(simulated)
         self.poses = []
@@ -177,7 +179,7 @@ class State:
                 count += 1
 
         print(self.objects)
-        run = Run(name="RUN {}".format(self.run_number), dry_run=self.simulated)  # name is only used for display/debugging purposes
+        run = Run(name="trial {}".format(self.run_number), dry_run=False)#self.simulated)  # name is only used for display/debugging purposes
         run.start()  # start the run
         min_count = 1
         potential_shipping = ["Priority Mail - USPS", "FedEx"]
@@ -265,7 +267,7 @@ class State:
                 print("shipping box company at x: {}, y: {}: {}".format(obj['x'], obj['y'], potential_shipping[0]))
         for name in object_data:
             if "location" in object_data[name] and object_data[name]["num_submit"] < object_data[name]["num_object"]:
-                run.localize(obj['name'],
+                run.localize(name,
                                 [object_data[name]["location"]['x'], object_data[name]["location"]['y']])
                 object_data[name]["num_submit"] += 1
         run.stop()  # stop the run
