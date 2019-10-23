@@ -20,7 +20,7 @@ def avg(arr):
     return sum(arr) / len(arr)
 
 class State:
-    def __init__(self, sched, simulated, run_number, try_legit, auto_submit_minutes):
+    def __init__(self, sched, simulated, run_number, try_legit, auto_submit_minutes, use_robot_location, min_count):
         self.sched = sched
         # self.sched.add_robot('codebox1', utils.bottom_I_close2wall)
         self.waypoints = [
@@ -119,6 +119,8 @@ class State:
         self.start_time = time.time()
         self.auto_submit_time = self.start_time + 60 * auto_submit_minutes
         self.rotation_steps = 4
+        self.use_robot_location = use_robot_location
+        self.min_count = min_count
         self.run = Run(name="trial {}".format(self.run_number), dry_run=self.simulated)  # name is only used for display/debugging purposes
         self.run.start()  # start the run
 
@@ -175,7 +177,8 @@ class State:
         delta_same_object = 5
         bbox = self.get_size_data(m, i)
         size = abs(bbox[1] - bbox[3])
-        x, y = get_coordinates(x, y, angle, bbox, size)
+        if not self.use_robot_location:
+            x, y = get_coordinates(x, y, angle, bbox, size)
         if class_name in self.objects:
             if m['timestamp'] - self.objects[class_name]["last_timestamp"] > delta_same_object:
                 # add new object
@@ -268,12 +271,11 @@ class State:
 
     def submit(self):
         print(self.objects)
-        min_count = 5
         potential_shipping = ["Priority Mail - USPS", "FedEx"]
         if self.try_legit:
             for obj_name in self.objects:
                 for obj in self.objects[obj_name]:
-                    if obj["count"] > min_count:
+                    if obj["count"] > self.min_count:
                         if obj_name in self.given_object_data:
                             if self.given_object_data[obj_name]["num_submit"] < self.given_object_data[obj_name]["num_object"]:
                                 if "location" in self.given_object_data[obj_name]:
@@ -303,8 +305,10 @@ sched = utils.Scheduler()
 simulated = False
 run_number = 1
 try_legit = True
+use_robot_location = True
+min_count = 1
 auto_submit_minutes = 9.5
-state = State(sched, simulated, run_number, try_legit, auto_submit_minutes)
+state = State(sched, simulated, run_number, try_legit, auto_submit_minutes, use_robot_location, min_count)
 
 # sched.goto(orspy.EulerPose(68.73, 105.66, 0, 0, 0, 0),
 #                                      allowed_trans_error=0.3, allowed_rot_error=0.5)
