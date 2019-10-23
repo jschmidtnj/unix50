@@ -166,9 +166,13 @@ class State:
         pixels_tall = 480
         focal_length = 0.001933 # meters
         average_location_box = avg([bbox[1], bbox[3]])
-        angle_from_robot = ((robot_angle + 1) / 2. * math.pi * 2) - field_of_view / 2. + average_location_box * field_of_view
+        robot_angle_rad = (robot_angle + 1) / 2. * math.pi * 2)
+        angle_from_robot = (robot_angle_rad - field_of_view / 2. + average_location_box * field_of_view
         x_location = robot_x + math.sin(angle_from_robot) * fudge_factor
         y_location = robot_y + math.cos(angle_from_robot) * fudge_factor
+        # account for camera not in center
+        x_location -= math.sin(robot_angle_rad) * camera_offset_front
+        y_location -= math.cos(robot_angle_rad) * camera_offset_front
         return x_location, y_location
 
     def save_object(self, class_name, m, x, y, angle):
