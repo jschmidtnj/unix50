@@ -30,12 +30,11 @@ class State:
             pose_from_info(69.1, 98.5, 3*math.pi/2),
             pose_from_info(68.5, 101.5, math.pi),
             pose_from_info(66, 105.5),
-            pose_from_info(68.5, 105.5)],
+            pose_from_info(68.5, 105.5),
             pose_from_info(71, 112, math.pi),
             pose_from_info(68, 113.5, 3.*math.pi/2.),
             pose_from_info(66, 113.8, 3. * math.pi / 2.),
             pose_from_info(66, 111.8, 0.001),
-
             pose_from_info(67, 108),
             pose_from_info(65.2, 108),
             pose_from_info(65.2, 105.5),
